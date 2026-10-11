@@ -4,7 +4,6 @@ metadata:
   name: product-service
   namespace: microservices
 spec:
-  replicas: 3
   selector:
     matchLabels:
       app: product-service
