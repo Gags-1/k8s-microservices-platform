@@ -1,6 +1,46 @@
-from fastapi import FastAPI, HTTPException
+import json
+import logging
+import sys
+from fastapi import FastAPI, HTTPException, Request
 
 app = FastAPI(title="Product Service")
+
+# Configure JSON logging to stdout
+logging.basicConfig(
+    level=logging.INFO,
+    stream=sys.stdout,
+    format="%(message)s",
+)
+
+logger = logging.getLogger("product-service")
+
+
+class JSONFormatter(logging.Formatter):
+    def format(self, record):
+        return json.dumps({
+            "level": record.levelname,
+            "service": "product-service",
+            "message": record.getMessage(),
+        })
+
+
+for handler in logging.root.handlers:
+    handler.setFormatter(JSONFormatter())
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    response = await call_next(request)
+
+    logger.info(json.dumps({
+        "event": "http_request",
+        "method": request.method,
+        "path": request.url.path,
+        "status_code": response.status_code,
+    }))
+
+    return response
+
 
 PRODUCTS = {
     1: {"id": 1, "name": "Mechanical Keyboard", "price": 2500},
