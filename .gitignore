@@ -6,3 +6,4 @@ venv/
 *.log
 .pytest_cache/
 .coverage
+/k8s/app-secret.yaml

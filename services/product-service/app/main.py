@@ -53,6 +53,9 @@ PRODUCTS = {
 def health():
     return {"status": "healthy", "service": "product-service"}
 
+@app.get("/version")
+def version():
+    return {"service": "product-service", "version": "v2"}
 
 @app.get("/products")
 def list_products():
