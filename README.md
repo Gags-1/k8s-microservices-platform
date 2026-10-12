@@ -475,8 +475,8 @@ Common issues include image-tag mismatches, missing ConfigMaps or Secrets, faile
 
 ## Next Steps
 
-1. **Phase 6 — Centralized Logging:** collect and search logs across the services and Kubernetes workloads, then practice log-based troubleshooting.
-2. **Phase 7 — Terraform and AWS:** define infrastructure as code and plan cloud deployment carefully, including cost controls.
+1. **Phase 6 — Terraform and AWS:** define infrastructure as code and plan cloud deployment carefully, including cost controls.
+2. **Phase 7 — Centralized Logging:** collect and search logs across the services and Kubernetes workloads, then practice log-based troubleshooting.
 3. Complete failure simulations and practice explaining the architecture and trade-offs.
 
 ## Roadmap
@@ -489,6 +489,6 @@ Common issues include image-tag mismatches, missing ConfigMaps or Secrets, faile
 | 4 | CI/CD with GitHub Actions, automated tests, image publishing and Argo CD GitOps example | Completed |
 | 5 | Monitoring and observability with Prometheus, application metrics, Grafana dashboards and alert rules | Implemented locally|
 | 6 | Centralized logging and log-based troubleshooting | Next |
-| 7 | Infrastructure as Code with Terraform and deployment on AWS | Planned |
-| 8 | Failure simulations, incident troubleshooting and interview preparation | Planned |
+| 7 | Failure simulations, incident troubleshooting and interview preparation | Planned | 
+| 8 | Infrastructure as Code with Terraform and deployment on AWS | Planned |
 
