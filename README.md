@@ -1,6 +1,6 @@
 # Kubernetes Microservices Platform
 
-A containerized platform consisting of two Python FastAPI microservices, with local development through Docker Compose and Kubernetes deployment manifests for a `kind` cluster.
+A containerized platform consisting of two Python FastAPI microservices, with local development through Docker Compose and Kubernetes deployment manifest for a `kind` cluster.
 
 ## Architecture
 
@@ -48,6 +48,8 @@ In Kubernetes, each application runs in a Deployment and is exposed internally t
 - Horizontal Pod Autoscaler (HPA)
 - NGINX Ingress
 - Metrics Server
+- Prometheus and `prometheus-client` application instrumentation
+- Grafana dashboards and alert rules
 
 ## Project Structure
 
@@ -79,6 +81,10 @@ k8s-microservices-platform/
 │   └── gitops-demo/
 │       ├── drift-demo.yaml
 │       └── README.md
+├── monitoring/
+│   ├── prometheus.yml
+│   └── grafana/
+│       └── grafana.yaml
 ├── docker-compose.yml
 ├── .gitignore
 └── README.md
@@ -94,6 +100,7 @@ k8s-microservices-platform/
 | GET | `/version` | Returns the service version |
 | GET | `/products` | Lists available products |
 | GET | `/products/{product_id}` | Retrieves a product by ID |
+| GET | `/metrics/` | Prometheus metrics endpoint |
 
 Sample product IDs: `1`, `2`, and `3`.
 
@@ -103,6 +110,7 @@ Sample product IDs: `1`, `2`, and `3`.
 |---|---|---|
 | GET | `/health` | Health check |
 | GET | `/orders/demo` | Creates a demonstration order using Product Service data |
+| GET | `/metrics/` | Prometheus metrics endpoint |
 
 The Order Service uses the `PRODUCT_SERVICE_URL` environment variable to locate Product Service. Its HTTP request has a three-second timeout, and dependency failures are returned as HTTP 502 responses.
 
@@ -364,6 +372,66 @@ The `k8s/volume-demo.yaml` manifest demonstrates an `emptyDir` volume mounted at
 
 An `emptyDir` volume is temporary storage associated with the lifetime of its Pod. It is useful for shared container storage and ephemeral data, but it is not persistent storage for production workloads.
 
+## Phase 5: Monitoring and Observability
+
+Prometheus and Grafana run in the local Kubernetes cluster in the `monitoring` namespace.
+
+### Prometheus
+
+Configuration is in `monitoring/prometheus.yml`. Prometheus scrapes itself and both application services:
+
+- Product Service: `product-service.microservices.svc.cluster.local:8000/metrics/`
+- Order Service: `order-service.microservices.svc.cluster.local:8000/metrics/`
+
+The application scrape paths use `/metrics/` because the mounted metrics application redirects the path without the trailing slash.
+
+Useful checks:
+
+```bash
+kubectl get pods -n monitoring
+kubectl get configmap prometheus-config -n monitoring
+kubectl port-forward -n monitoring svc/prometheus 9090:9090
+```
+
+Open `http://localhost:9090/targets` and verify that the Prometheus, Product Service, and Order Service targets are `UP`.
+
+Example PromQL queries:
+
+```promql
+up
+```
+
+```promql
+sum by (service) (rate(http_requests_total[5m]))
+```
+
+```promql
+100 * sum by (service) (rate(http_requests_total{status=~"5.."}[5m]))
+/ clamp_min(sum by (service) (rate(http_requests_total[5m])), 0.001)
+```
+
+```promql
+histogram_quantile(
+  0.95,
+  sum by (le, service) (rate(http_request_duration_seconds_bucket[5m]))
+)
+```
+
+These queries show scrape status, request rate by service, estimated HTTP 5xx percentage, and p95 request latency by service.
+
+### Grafana
+
+Grafana is deployed using `monitoring/grafana/grafana.yaml` and uses Prometheus as its data source. A request-rate panel has been created, and alert rules have been configured for:
+
+1. Product or Order Service scrape target down.
+2. High HTTP 5xx percentage.
+3. High p95 request latency.
+4. Any Prometheus scrape target down.
+
+Alert evaluation depends on the configured query, threshold, and pending period. Generate requests and use controlled test failures where safe to exercise the queries before relying on them operationally.
+
+**Reproducibility note:** The Grafana Deployment and Service are version-controlled, but dashboards and alert rules created manually in the Grafana UI are not yet fully provisioned from Git. Export or provision them before treating a fresh deployment as fully reproducible.
+
 ## Troubleshooting Commands
 
 Inspect Pods and events:
@@ -405,6 +473,12 @@ Common issues include image-tag mismatches, missing ConfigMaps or Secrets, faile
 - The Metrics Server TLS workaround used in this local environment is not a production configuration.
 - The current manifests and local cluster are not a production-hardened deployment.
 
+## Next Steps
+
+1. **Phase 6 — Centralized Logging:** collect and search logs across the services and Kubernetes workloads, then practice log-based troubleshooting.
+2. **Phase 7 — Terraform and AWS:** define infrastructure as code and plan cloud deployment carefully, including cost controls.
+3. Complete failure simulations and practice explaining the architecture and trade-offs.
+
 ## Roadmap
 
 | Phase | Scope | Status |
@@ -413,7 +487,8 @@ Common issues include image-tag mismatches, missing ConfigMaps or Secrets, faile
 | 2 | Kubernetes fundamentals, service discovery, configuration, probes, rollouts, Ingress and volumes | Completed |
 | 3 | Resource management, Metrics Server, HPA and reliability concepts | Covered; further load testing planned |
 | 4 | CI/CD with GitHub Actions, automated tests, image publishing and Argo CD GitOps example | Completed |
-| 5 | Monitoring with Prometheus and Grafana | Planned |
-| 6 | Centralized logging and log-based troubleshooting | Planned |
+| 5 | Monitoring and observability with Prometheus, application metrics, Grafana dashboards and alert rules | Implemented locally|
+| 6 | Centralized logging and log-based troubleshooting | Next |
 | 7 | Infrastructure as Code with Terraform and deployment on AWS | Planned |
 | 8 | Failure simulations, incident troubleshooting and interview preparation | Planned |
+

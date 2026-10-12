@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: order-service
-          image: ghcr.io/gags-1/k8s-microservices-platform-order-service:6e69b64
+          image: ghcr.io/gags-1/k8s-microservices-platform-order-service:04e90e1
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
