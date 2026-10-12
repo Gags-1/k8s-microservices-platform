@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: product-service
-          image: k8s-microservices-platform-product-service:v2
+          image: ghcr.io/gags-1/k8s-microservices-platform-product-service:6e69b64
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
