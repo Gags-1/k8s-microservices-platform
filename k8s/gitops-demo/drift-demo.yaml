@@ -4,7 +4,7 @@ metadata:
   name: gitops-drift-demo
   namespace: microservices
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     matchLabels:
       app: gitops-drift-demo
