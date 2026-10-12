@@ -1,8 +1,6 @@
 # Kubernetes Microservices Platform
 
-A hands-on DevOps project demonstrating how to containerize, deploy, scale, and troubleshoot Python microservices using Docker, Kubernetes, and supporting cloud-native tools.
-
-This project is being developed incrementally, with an emphasis on practical implementation, operational troubleshooting, reliability, and interview-ready understanding.
+A containerized platform consisting of two Python FastAPI microservices, with local development through Docker Compose and Kubernetes deployment manifests for a `kind` cluster.
 
 ## Architecture
 
@@ -41,6 +39,9 @@ In Kubernetes, each application runs in a Deployment and is exposed internally t
 - Docker and Docker Compose
 - Kubernetes and `kubectl`
 - `kind` — Kubernetes in Docker
+- GitHub Actions
+- GitHub Container Registry (GHCR)
+- Argo CD
 - Kubernetes ConfigMaps and Secrets
 - Readiness and liveness probes
 - Resource requests and limits
@@ -52,6 +53,9 @@ In Kubernetes, each application runs in a Deployment and is exposed internally t
 
 ```text
 k8s-microservices-platform/
+├── .github/
+│   └── workflows/
+│       └── ci.yml
 ├── services/
 │   ├── product-service/
 │   │   ├── app/
@@ -63,6 +67,8 @@ k8s-microservices-platform/
 │       │   └── main.py
 │       ├── Dockerfile
 │       └── requirements.txt
+├── scripts/
+│   └── deploy-local.sh
 ├── k8s/
 │   ├── product-service.yaml
 │   ├── order-service.yaml
@@ -70,7 +76,9 @@ k8s-microservices-platform/
 │   ├── product-service-hpa.yaml
 │   ├── product-ingress.yaml
 │   ├── volume-demo.yaml
-│   └── app-secret.yaml       # Local-only; ignored by Git
+│   └── gitops-demo/
+│       ├── drift-demo.yaml
+│       └── README.md
 ├── docker-compose.yml
 ├── .gitignore
 └── README.md
@@ -155,7 +163,7 @@ kubectl config current-context
 kubectl get nodes
 ```
 
-The expected context for this lab is `kind-microservices`.
+The expected context for this environment is `kind-microservices`.
 
 If the cluster does not exist, create it:
 
@@ -189,7 +197,7 @@ kind load docker-image \
   --name microservices
 ```
 
-The local image tags must match the tags in the Kubernetes Deployment manifests.
+The local image tags must match the tags in the Kubernetes Deployment manifests. The CI workflow also publishes service images to GHCR.
 
 ### 3. Create the namespace and application configuration
 
@@ -204,7 +212,7 @@ Apply the ConfigMap:
 kubectl apply -f k8s/order-service-config.yaml
 ```
 
-Create a dummy practice Secret for the current manifest:
+Create a local practice Secret for the current manifest:
 
 ```bash
 kubectl create secret generic app-secret \
@@ -213,7 +221,7 @@ kubectl create secret generic app-secret \
   --dry-run=client -o yaml | kubectl apply -f -
 ```
 
-This value is for local practice only. The current application does not use this password, and no real credentials should be committed to Git.
+This value is for local use only. The current application does not use this password, and no real credentials should be committed to Git.
 
 ### 4. Deploy the services
 
@@ -268,6 +276,20 @@ curl http://localhost:8002/orders/demo
 ```
 
 Stop port forwarding with `Ctrl+C` when finished.
+
+## CI/CD
+
+GitHub Actions is configured in `.github/workflows/ci.yml`.
+
+- Runs automated tests for Product Service and Order Service on pushes and pull requests to `main`.
+- Builds and publishes service container images to GitHub Container Registry (GHCR) for non-pull-request builds.
+- Publishes commit-SHA and `latest` image tags.
+
+The repository includes `scripts/deploy-local.sh`, which applies the local Kubernetes configuration, waits for rollout completion, and performs health/smoke checks.
+
+## GitOps
+
+Argo CD is used for a separate GitOps example under `k8s/gitops-demo/`. The `gitops-drift-demo` Application tracks that repository path and demonstrates Git-driven replica updates and self-healing. Argo CD is **not currently managing the Product Service or Order Service Deployments**.
 
 ## Kubernetes Concepts Implemented
 
@@ -326,7 +348,7 @@ kubectl describe hpa product-service -n microservices
 kubectl top pods -n microservices
 ```
 
-HPA requires working resource metrics from Metrics Server. The HPA configuration and metrics have been verified in the local lab; successful scale-up under sustained load has not yet been demonstrated.
+HPA requires working resource metrics from Metrics Server. The HPA configuration and metrics have been verified in the local environment; successful scale-up under sustained load has not yet been demonstrated.
 
 ### Ingress
 
@@ -340,7 +362,7 @@ This requires a compatible Ingress controller, appropriate local hostname resolu
 
 The `k8s/volume-demo.yaml` manifest demonstrates an `emptyDir` volume mounted at `/data`.
 
-An `emptyDir` volume is temporary storage associated with the lifetime of its Pod. It is useful for understanding shared container storage and ephemeral data, but it is not persistent storage for production workloads.
+An `emptyDir` volume is temporary storage associated with the lifetime of its Pod. It is useful for shared container storage and ephemeral data, but it is not persistent storage for production workloads.
 
 ## Troubleshooting Commands
 
@@ -380,32 +402,18 @@ Common issues include image-tag mismatches, missing ConfigMaps or Secrets, faile
 - `k8s/app-secret.yaml` is intentionally excluded by `.gitignore`.
 - Do not commit real passwords, tokens, cloud credentials, or private keys.
 - Kubernetes Secrets are not automatically secure merely because their values are base64-encoded. Production deployments need appropriate access controls and secret-management practices.
-- The Metrics Server TLS workaround used in this local lab is not a production configuration.
-- This project is a learning environment, not a production-hardened platform.
+- The Metrics Server TLS workaround used in this local environment is not a production configuration.
+- The current manifests and local cluster are not a production-hardened deployment.
 
-## Development Roadmap
+## Roadmap
 
 | Phase | Scope | Status |
 |---|---|---|
 | 1 | Dockerized FastAPI microservices and Docker Compose | Completed |
 | 2 | Kubernetes fundamentals, service discovery, configuration, probes, rollouts, Ingress and volumes | Completed |
 | 3 | Resource management, Metrics Server, HPA and reliability concepts | Covered; further load testing planned |
-| 4 | CI/CD with GitHub Actions, automated tests, container image publishing and GitOps concepts | Next |
+| 4 | CI/CD with GitHub Actions, automated tests, image publishing and Argo CD GitOps example | Completed |
 | 5 | Monitoring with Prometheus and Grafana | Planned |
 | 6 | Centralized logging and log-based troubleshooting | Planned |
 | 7 | Infrastructure as Code with Terraform and deployment on AWS | Planned |
 | 8 | Failure simulations, incident troubleshooting and interview preparation | Planned |
-
-Future phases will extend this project toward a more complete DevOps workflow, including automated validation, repeatable infrastructure provisioning, observability, and operational testing.
-
-## Project Goals
-
-This project is intended to demonstrate practical understanding of:
-
-- Containerization and multi-service application architecture.
-- Kubernetes deployment, networking, configuration, and scaling.
-- Health checks, resource management, and troubleshooting.
-- CI/CD and infrastructure automation.
-- Monitoring, logging, and reliability engineering.
-
-The project will evolve as each phase is implemented and tested.
