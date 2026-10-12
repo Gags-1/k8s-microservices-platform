@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitops-drift-demo
+  namespace: microservices
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: gitops-drift-demo
+  template:
+    metadata:
+      labels:
+        app: gitops-drift-demo
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
