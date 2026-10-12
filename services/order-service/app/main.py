@@ -1,9 +1,55 @@
 import os
-
+import time
+from prometheus_client import Counter, Histogram, make_asgi_app
 import httpx
 from fastapi import FastAPI, HTTPException
 
 app = FastAPI(title="Order Service")
+
+REQUEST_COUNT = Counter(
+    "http_requests_total",
+    "Total HTTP requests",
+    ["service", "method", "endpoint", "status"],
+)
+
+REQUEST_LATENCY = Histogram(
+    "http_request_duration_seconds",
+    "HTTP request latency in seconds",
+    ["service", "method", "endpoint"],
+)
+
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
+
+
+@app.middleware("http")
+async def collect_metrics(request, call_next):
+    if request.url.path.startswith("/metrics"):
+        return await call_next(request)
+
+    start_time = time.perf_counter()
+
+    response = await call_next(request)
+
+    duration = time.perf_counter() - start_time
+    endpoint = request.scope.get("route")
+    endpoint_path = getattr(endpoint, "path", request.url.path)
+
+    REQUEST_COUNT.labels(
+        service="order-service",
+        method=request.method,
+        endpoint=endpoint_path,
+        status=str(response.status_code),
+    ).inc()
+
+    REQUEST_LATENCY.labels(
+        service="order-service",
+        method=request.method,
+        endpoint=endpoint_path,
+    ).observe(duration)
+
+    return response
+
 
 PRODUCT_SERVICE_URL = os.getenv(
     "PRODUCT_SERVICE_URL",

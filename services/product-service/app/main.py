@@ -1,9 +1,27 @@
+import time
+from prometheus_client import Counter, Histogram, make_asgi_app
+
 import json
 import logging
 import sys
 from fastapi import FastAPI, HTTPException, Request
 
 app = FastAPI(title="Product Service")
+
+REQUEST_COUNT = Counter(
+    "http_requests_total",
+    "Total HTTP requests",
+    ["service", "method", "endpoint", "status"],
+)
+
+REQUEST_LATENCY = Histogram(
+    "http_request_duration_seconds",
+    "HTTP request latency in seconds",
+    ["service", "method", "endpoint"],
+)
+
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
 
 # Configure JSON logging to stdout
 logging.basicConfig(
@@ -30,7 +48,30 @@ for handler in logging.root.handlers:
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
+    # Keep metrics scraping from inflating application request metrics.
+    if request.url.path.startswith("/metrics"):
+        return await call_next(request)
+
+    start_time = time.perf_counter()
+
     response = await call_next(request)
+
+    duration = time.perf_counter() - start_time
+    endpoint = request.scope.get("route")
+    endpoint_path = getattr(endpoint, "path", request.url.path)
+
+    REQUEST_COUNT.labels(
+        service="product-service",
+        method=request.method,
+        endpoint=endpoint_path,
+        status=str(response.status_code),
+    ).inc()
+
+    REQUEST_LATENCY.labels(
+        service="product-service",
+        method=request.method,
+        endpoint=endpoint_path,
+    ).observe(duration)
 
     logger.info(json.dumps({
         "event": "http_request",
@@ -40,7 +81,6 @@ async def log_requests(request: Request, call_next):
     }))
 
     return response
-
 
 PRODUCTS = {
     1: {"id": 1, "name": "Mechanical Keyboard", "price": 2500},
