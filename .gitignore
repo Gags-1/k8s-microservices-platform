@@ -7,3 +7,15 @@ venv/
 .pytest_cache/
 .coverage
 /k8s/app-secret.yaml
+
+# Terraform generated files and sensitive state
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+addons.tfplan
+recovery.tfplan
+terraform-state-backup-*.json
+*.tfvars
+*.tfvars.json

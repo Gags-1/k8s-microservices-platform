@@ -1,6 +1,6 @@
 # Kubernetes Microservices Platform
 
-A containerized platform consisting of two Python FastAPI microservices, with local development through Docker Compose and Kubernetes deployment manifest for a `kind` cluster.
+A containerized platform consisting of two Python FastAPI microservices. It supports local development with Docker Compose and `kind`, plus an AWS EKS deployment provisioned with Terraform and released with Helm.
 
 ## Architecture
 
@@ -9,7 +9,7 @@ The platform contains two FastAPI microservices:
 - **Product Service** — exposes product information through a REST API.
 - **Order Service** — retrieves product information from Product Service to create a demonstration order.
 
-The services can run locally using Docker Compose or inside a local Kubernetes cluster created with `kind`.
+The services can run locally using Docker Compose or `kind`, and have also been deployed to an AWS EKS cluster. The EKS workloads are exposed as internal ClusterIP Services; the verified cloud smoke tests used `kubectl port-forward` rather than a public application endpoint.
 
 ```text
                   Client
@@ -41,7 +41,9 @@ In Kubernetes, each application runs in a Deployment and is exposed internally t
 - `kind` — Kubernetes in Docker
 - GitHub Actions
 - GitHub Container Registry (GHCR)
-- Argo CD
+- Argo CD (separate GitOps demo)
+- Terraform and Amazon EKS
+- Helm
 - Kubernetes ConfigMaps and Secrets
 - Readiness and liveness probes
 - Resource requests and limits
@@ -71,6 +73,10 @@ k8s-microservices-platform/
 │       └── requirements.txt
 ├── scripts/
 │   └── deploy-local.sh
+├── terraform/
+│   └── eks/                 # EKS infrastructure as code
+├── helm/
+│   └── k8s-microservices-platform/  # Helm chart
 ├── k8s/
 │   ├── product-service.yaml
 │   ├── order-service.yaml
@@ -85,6 +91,8 @@ k8s-microservices-platform/
 │   ├── prometheus.yml
 │   └── grafana/
 │       └── grafana.yaml
+├── evidence/
+│   └── eks/                 # EKS smoke-test output and screenshots
 ├── docker-compose.yml
 ├── .gitignore
 └── README.md
@@ -285,6 +293,78 @@ curl http://localhost:8002/orders/demo
 
 Stop port forwarding with `Ctrl+C` when finished.
 
+
+## AWS EKS Deployment
+
+The project has been deployed to Amazon EKS using Terraform for infrastructure and Helm for application resources.
+
+- **Cluster:** `microservices-demo` (Kubernetes 1.37, `us-east-1`)
+- **Worker capacity:** one `t3.small` managed node in the demo configuration
+- **Infrastructure:** Terraform EKS module, EKS add-ons, CloudWatch control-plane logs with seven-day retention, and a KMS key alias for the cluster
+- **Application release:** Helm release `microservices-platform` in namespace `microservices`
+- **Images:** Product Service and Order Service images published to GHCR and pinned to a commit-SHA tag
+- **Service access:** ClusterIP Services, tested through `kubectl port-forward`; no public application Ingress or LoadBalancer is configured for this EKS deployment
+- **Evidence:** see [`evidence/eks/`](evidence/eks/) for smoke-test output and screenshots
+
+### Deploy the application to an existing EKS cluster
+
+First configure `kubectl` for the intended cluster and ensure the required namespace and Secret exist. Do not commit real credentials or print Secret values.
+
+```bash
+aws eks update-kubeconfig --region us-east-1 --name microservices-demo
+kubectl get nodes
+kubectl create namespace microservices --dry-run=client -o yaml | kubectl apply -f -
+```
+
+Create the `app-secret` Secret securely in your environment before deploying. The chart expects the key `DB_PASSWORD`; the current application does not use this value.
+
+Install or update the Helm release from the repository root:
+
+```bash
+helm upgrade --install microservices-platform \
+  ./helm/k8s-microservices-platform \
+  --namespace microservices \
+  --set productService.replicaCount=1 \
+  --set orderService.replicaCount=1
+```
+
+Verify the release and workloads:
+
+```bash
+helm status microservices-platform -n microservices
+kubectl get deployments,pods,services -n microservices
+kubectl rollout status deployment/product-service -n microservices
+kubectl rollout status deployment/order-service -n microservices
+```
+
+### Smoke-test the EKS services
+
+Run each port-forward command in a separate terminal:
+
+```bash
+kubectl port-forward -n microservices service/product-service 8001:8000
+```
+
+```bash
+curl http://localhost:8001/health
+curl http://localhost:8001/products
+```
+
+```bash
+kubectl port-forward -n microservices service/order-service 8002:8000
+```
+
+```bash
+curl http://localhost:8002/health
+curl http://localhost:8002/orders/demo
+```
+
+Expected checks include healthy responses from both services and a demo order containing product details and the calculated total. The captured run is recorded in [`evidence/eks/api-smoke-tests.txt`](evidence/eks/api-smoke-tests.txt).
+
+### Terraform infrastructure
+
+Terraform configuration is located in [`terraform/eks/`](terraform/eks/). Review the variables and current AWS account/region before running Terraform. `terraform plan` should be reviewed before any apply or destroy operation. EKS and its supporting resources can incur charges while provisioned; destroy the demo infrastructure when you are finished using it, after reviewing the destroy plan.
+
 ## CI/CD
 
 GitHub Actions is configured in `.github/workflows/ci.yml`.
@@ -432,6 +512,17 @@ Alert evaluation depends on the configured query, threshold, and pending period.
 
 **Reproducibility note:** The Grafana Deployment and Service are version-controlled, but dashboards and alert rules created manually in the Grafana UI are not yet fully provisioned from Git. Export or provision them before treating a fresh deployment as fully reproducible.
 
+
+## EKS Deployment Evidence
+
+The following screenshots were captured from the successful EKS deployment and smoke tests.
+
+| Evidence | Screenshot |
+|---|---|
+| EKS workloads and services | ![EKS workloads and services](evidence/eks/screenshots/services1.png) |
+| Helm release status | ![Helm release status](evidence/eks/screenshots/Helm.png) |
+| API smoke tests | ![EKS API smoke tests](evidence/eks/screenshots/services2.png) |
+
 ## Troubleshooting Commands
 
 Inspect Pods and events:
@@ -475,9 +566,10 @@ Common issues include image-tag mismatches, missing ConfigMaps or Secrets, faile
 
 ## Next Steps
 
-1. **Phase 6 — Terraform and AWS:** define infrastructure as code and plan cloud deployment carefully, including cost controls.
-2. **Phase 7 — Centralized Logging:** collect and search logs across the services and Kubernetes workloads, then practice log-based troubleshooting.
-3. Complete failure simulations and practice explaining the architecture and trade-offs.
+1. **Centralized Logging:** collect and search logs across the services and Kubernetes workloads, then practice log-based troubleshooting.
+2. **Reproducibility:** provision Grafana dashboards and alert rules from version-controlled configuration.
+3. **Reliability testing:** run controlled failure simulations, validate alert behavior, and document recovery steps.
+4. **Optional cloud enhancements:** configure and test EKS ingress and HPA scaling only when needed, with cost and cleanup plans.
 
 ## Roadmap
 
@@ -488,7 +580,7 @@ Common issues include image-tag mismatches, missing ConfigMaps or Secrets, faile
 | 3 | Resource management, Metrics Server, HPA and reliability concepts | Covered; further load testing planned |
 | 4 | CI/CD with GitHub Actions, automated tests, image publishing and Argo CD GitOps example | Completed |
 | 5 | Monitoring and observability with Prometheus, application metrics, Grafana dashboards and alert rules | Implemented locally|
-| 6 | Centralized logging and log-based troubleshooting | Next |
-| 7 | Failure simulations, incident troubleshooting and interview preparation | Planned | 
-| 8 | Infrastructure as Code with Terraform and deployment on AWS | Planned |
+| 6 | Terraform infrastructure and AWS EKS deployment with Helm | Completed; smoke tests passed |
+| 7 | Centralized logging and log-based troubleshooting | Next |
+| 8 | Failure simulations, incident troubleshooting and interview preparation | Planned |
 

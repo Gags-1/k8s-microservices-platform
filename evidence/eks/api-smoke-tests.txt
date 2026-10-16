@@ -1,0 +1,58 @@
+
+========================================
+ Product Service Health
+========================================
+{
+    "status": "healthy",
+    "service": "product-service"
+}
+
+
+========================================
+ Product Catalog
+========================================
+[
+    {
+        "id": 1,
+        "name": "Mechanical Keyboard",
+        "price": 2500
+    },
+    {
+        "id": 2,
+        "name": "Wireless Mouse",
+        "price": 1200
+    },
+    {
+        "id": 3,
+        "name": "USB-C Hub",
+        "price": 1800
+    }
+]
+
+
+========================================
+ Order Service Health
+========================================
+{
+    "status": "healthy",
+    "service": "order-service"
+}
+
+
+========================================
+ End-to-End Demo Order
+========================================
+{
+    "order_id": "ORD-1001",
+    "status": "created",
+    "product": {
+        "id": 1,
+        "name": "Mechanical Keyboard",
+        "price": 2500
+    },
+    "quantity": 1,
+    "total": 2500
+}
+
+
+All API smoke tests passed.
