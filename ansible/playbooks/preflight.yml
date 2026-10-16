@@ -1,0 +1,23 @@
+---
+- name: Validate local DevOps environment
+  hosts: local
+  gather_facts: true
+
+  tasks:
+    - name: Verify Python is available
+      ansible.builtin.command: python3 --version
+      register: python_version
+      changed_when: false
+
+    - name: Verify Git is available
+      ansible.builtin.command: git --version
+      register: git_version
+      changed_when: false
+
+    - name: Display environment details
+      ansible.builtin.debug:
+        msg:
+          - "Host: {{ ansible_hostname }}"
+          - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+          - "{{ python_version.stdout }}"
+          - "{{ git_version.stdout }}"

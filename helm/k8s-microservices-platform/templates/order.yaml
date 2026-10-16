@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service
+  labels:
+    {{- include "platform.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.orderService.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "platform.selectorLabels" (dict "Release" .Release "component" "order-service") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "platform.selectorLabels" (dict "Release" .Release "component" "order-service") | nindent 8 }}
+    spec:
+      containers:
+        - name: order-service
+          image: "{{ .Values.orderService.image.repository }}:{{ .Values.orderService.image.tag }}"
+          imagePullPolicy: {{ .Values.orderService.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: PRODUCT_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: order-service-config
+                  key: PRODUCT_SERVICE_URL
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.orderService.existingSecret }}
+                  key: {{ .Values.orderService.secretKey }}
+          resources:
+            {{- toYaml .Values.orderService.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: {{ .Values.orderService.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.orderService.probes.readiness.periodSeconds }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: {{ .Values.orderService.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.orderService.probes.liveness.periodSeconds }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-service
+  labels:
+    {{- include "platform.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.orderService.service.type }}
+  selector:
+    {{- include "platform.selectorLabels" (dict "Release" .Release "component" "order-service") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.orderService.service.port }}
+      targetPort: http

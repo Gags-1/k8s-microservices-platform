@@ -1,0 +1,63 @@
+productService:
+  name: product-service
+  replicaCount: 0
+  image:
+    repository: ghcr.io/gags-1/k8s-microservices-platform-product-service
+    tag: "04e90e1"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  probes:
+    readiness:
+      initialDelaySeconds: 3
+      periodSeconds: 5
+    liveness:
+      initialDelaySeconds: 10
+      periodSeconds: 10
+
+orderService:
+  name: order-service
+  replicaCount: 0
+  image:
+    repository: ghcr.io/gags-1/k8s-microservices-platform-order-service
+    tag: "04e90e1"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8000
+  productServiceUrl: "http://product-service:8000/products/1"
+  existingSecret: app-secret
+  secretKey: DB_PASSWORD
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  probes:
+    readiness:
+      initialDelaySeconds: 3
+      periodSeconds: 5
+    liveness:
+      initialDelaySeconds: 10
+      periodSeconds: 10
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 50
+
+ingress:
+  enabled: false
+  className: nginx
+  host: product.local

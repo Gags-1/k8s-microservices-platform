@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-service
+  labels:
+    {{- include "platform.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.productService.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "platform.selectorLabels" (dict "Release" .Release "component" "product-service") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "platform.selectorLabels" (dict "Release" .Release "component" "product-service") | nindent 8 }}
+    spec:
+      containers:
+        - name: product-service
+          image: "{{ .Values.productService.image.repository }}:{{ .Values.productService.image.tag }}"
+          imagePullPolicy: {{ .Values.productService.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8000
+          resources:
+            {{- toYaml .Values.productService.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: {{ .Values.productService.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.productService.probes.readiness.periodSeconds }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: {{ .Values.productService.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.productService.probes.liveness.periodSeconds }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: product-service
+  labels:
+    {{- include "platform.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.productService.service.type }}
+  selector:
+    {{- include "platform.selectorLabels" (dict "Release" .Release "component" "product-service") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.productService.service.port }}
+      targetPort: http

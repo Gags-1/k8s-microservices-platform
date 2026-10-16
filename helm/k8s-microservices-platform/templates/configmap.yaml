@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: order-service-config
+  labels:
+    {{- include "platform.labels" . | nindent 4 }}
+data:
+  PRODUCT_SERVICE_URL: {{ .Values.orderService.productServiceUrl | quote }}

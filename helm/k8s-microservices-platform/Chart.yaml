@@ -1,0 +1,6 @@
+apiVersion: v2
+name: k8s-microservices-platform
+description: Helm chart for the Product and Order FastAPI microservices
+type: application
+version: 0.1.0
+appVersion: "04e90e1"

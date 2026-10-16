@@ -1,0 +1,35 @@
+---
+- name: Check Kubernetes cluster readiness
+  hosts: local
+  gather_facts: false
+
+  tasks:
+    - name: Read current Kubernetes context
+      ansible.builtin.command: kubectl config current-context
+      register: kube_context
+      changed_when: false
+
+    - name: Verify expected kind context
+      ansible.builtin.assert:
+        that:
+          - kube_context.stdout == "kind-microservices"
+        fail_msg: "Unexpected Kubernetes context: {{ kube_context.stdout }}"
+        success_msg: "Connected to expected context: {{ kube_context.stdout }}"
+
+    - name: Read Kubernetes node status
+      ansible.builtin.command: kubectl get nodes
+      register: node_status
+      changed_when: false
+
+    - name: Display node status
+      ansible.builtin.debug:
+        var: node_status.stdout
+
+    - name: Read application deployment status
+      ansible.builtin.command: kubectl get deployments -n microservices
+      register: app_deployments
+      changed_when: false
+
+    - name: Display application deployment status
+      ansible.builtin.debug:
+        var: app_deployments.stdout
